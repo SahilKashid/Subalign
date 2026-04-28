@@ -1,0 +1,6 @@
+{
+  "name": "Subalign",
+  "description": "Professional spatial alignment tool for bulk subtitle repositioning across SRT, VTT, and ASS formats.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
