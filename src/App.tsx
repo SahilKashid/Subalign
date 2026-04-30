@@ -125,6 +125,7 @@ export default function App() {
   const [showGuides, setShowGuides] = useState(true);
   
   const previewRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Persistence
   useEffect(() => {
@@ -153,12 +154,6 @@ export default function App() {
     setFile(uploadedFile);
     setFormat(format);
     setItems(parsedItems);
-    // Use the first item's position if it has one, otherwise default
-    if (parsedItems[0]?.position) {
-      setGlobalOffset(parsedItems[0].position);
-    } else {
-      setGlobalOffset({ x: 50, y: 90 });
-    }
   };
 
   // Sample item for preview (using the first one as representative)
@@ -230,28 +225,45 @@ export default function App() {
           </div>
         </div>
 
-        {file && (
-          <div className="flex items-center gap-3">
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 border border-border-muted bg-bg-base rounded-xl text-[10px] font-mono font-bold text-text-muted">
-              <FileText size={12} className="text-blue-500" />
-              {file.name}
-            </div>
-            <button 
-              onClick={handleExport}
-              className="flex items-center gap-2 px-6 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] transition-all bg-blue-600 text-white rounded-xl hover:bg-blue-500 hover:shadow-2xl hover:shadow-blue-600/20 active:scale-95 font-display"
-            >
-              <Download size={14} />
-              Export Release
-            </button>
-            <button 
-              onClick={() => { setFile(null); setItems([]); }}
-              className="p-2.5 text-text-muted hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all border border-transparent hover:border-red-400/20"
-              title="Terminate Session"
-            >
-              <Trash2 size={18} />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <input 
+            type="file" 
+            ref={fileInputRef}
+            className="hidden" 
+            accept=".srt,.vtt,.ass,.ssa" 
+            onChange={handleFileUpload} 
+          />
+          
+          {file && (
+            <>
+              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 border border-border-muted bg-bg-base rounded-xl text-[10px] font-mono font-bold text-text-muted">
+                <FileText size={12} className="text-blue-500" />
+                {file.name}
+              </div>
+              <button 
+                onClick={handleExport}
+                className="flex items-center gap-2 px-6 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] transition-all bg-blue-600 text-white rounded-xl hover:bg-blue-500 hover:shadow-2xl hover:shadow-blue-600/20 active:scale-95 font-display"
+              >
+                <Download size={14} />
+                Export
+              </button>
+            </>
+          )}
+
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            className={cn(
+              "p-2.5 rounded-xl transition-all border font-display flex items-center gap-2",
+              file 
+                ? "text-text-muted hover:text-white hover:bg-white/5 border-transparent hover:border-border-muted" 
+                : "bg-blue-600/10 text-blue-500 border-blue-500/20 hover:bg-blue-600/20"
+            )}
+            title={file ? "Load New File" : "Import Subtitles"}
+          >
+            <Plus size={18} />
+            {!file && <span className="text-[10px] font-black uppercase tracking-widest pr-1">Add Subtitles</span>}
+          </button>
+        </div>
       </header>
 
       {/* Main Workspace - Zero Scroll Optimized */}
@@ -260,144 +272,118 @@ export default function App() {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-bg-base/50 to-bg-base pointer-events-none" />
         
         <div className="flex-1 w-full max-w-7xl mx-auto flex flex-col items-center justify-start relative z-10 min-h-0 px-4 py-4 md:py-6 gap-4 md:gap-6">
-          {!file ? (
-            <div className="flex-1 w-full flex flex-col items-center justify-center">
-              <label className="group relative cursor-pointer border-2 border-dashed border-border-muted p-12 md:p-20 rounded-[3rem] md:rounded-[4rem] w-full max-w-3xl hover:bg-blue-600/5 hover:border-blue-500/30 transition-all bg-bg-surface/30 flex flex-col items-center gap-8">
-                <div className="w-20 h-20 md:w-24 md:h-24 bg-blue-600/5 rounded-[2rem] md:rounded-[3rem] flex items-center justify-center border border-blue-500/10 shadow-inner-glow text-blue-500 relative">
-                   <Upload size={36} className="relative transition-transform group-hover:scale-110" />
+          {/* Stage Controls Overlay */}
+          <div className="flex items-center gap-3 p-1.5 bg-bg-surface/90 backdrop-blur-2xl border border-border-muted rounded-xl shadow-premium shrink-0 scale-90 sm:scale-100">
+             <div className="flex items-center gap-1 bg-bg-base rounded-lg border border-border-muted p-0.5">
+               <button onClick={() => setScale(s => Math.max(0.2, s - 0.1))} className="p-1.5 text-text-muted hover:text-white transition-colors"><ChevronLeft size={14}/></button>
+               <span className="text-[9px] font-black w-10 text-center text-blue-400 font-mono">{Math.round(scale * 100)}%</span>
+               <button onClick={() => setScale(s => Math.min(3, s + 0.1))} className="p-1.5 text-text-muted hover:text-white transition-colors"><ChevronRight size={14}/></button>
+             </div>
+             <div className="w-px h-4 bg-border-muted mx-0.5" />
+             <button 
+               onClick={() => setShowGuides(!showGuides)} 
+               className={cn(
+                 "p-2 rounded-lg transition-all", 
+                 showGuides ? "text-blue-500 bg-blue-500/10 shadow-inner-glow" : "text-text-muted hover:text-white"
+               )}
+             >
+               {showGuides ? <Eye size={16} /> : <EyeOff size={16} />}
+             </button>
+          </div>
+
+          {/* Canvas Container - Responsive Scaling */}
+          <div className="flex-1 w-full flex items-center justify-center min-h-0 overflow-hidden relative group/canvas-container">
+            <div 
+              ref={previewRef}
+              className={cn(
+                "relative aspect-video bg-[#000] shadow-[0_30px_100px_rgba(0,0,0,0.8)] overflow-hidden ring-1 ring-white/5 rounded-2xl w-full max-h-full transition-transform duration-300 ease-out",
+                showGuides ? "bg-grid opacity-100" : ""
+              )}
+              style={{ transform: `scale(${scale})`, width: 'auto', height: '100%', maxWidth: '100%' }}
+            >
+              {showGuides && (
+                <div className="absolute inset-0 pointer-events-none">
+                   <div className="absolute top-0 bottom-0 left-1/2 w-px bg-blue-500/20 -translate-x-1/2" />
+                   <div className="absolute left-0 right-0 top-1/2 h-px bg-blue-500/20 -translate-y-1/2" />
+                   <div className="absolute top-[10%] bottom-[10%] left-[10%] right-[10%] border border-dashed border-white/5 rounded-lg" />
                 </div>
-                <div className="text-center space-y-4">
-                  <h2 className="text-3xl md:text-5xl font-black text-white uppercase italic font-display tracking-tighter">
-                    Import Subtitle <span className="text-blue-500">Metadata</span>
-                  </h2>
-                  <p className="text-sm md:text-lg text-text-muted font-medium leading-relaxed max-w-md mx-auto">
-                    SRT • VTT • ASS Supported. Global alignment engine ready for deployment.
+              )}
+
+              <motion.div
+                className="absolute cursor-move select-none p-4 w-full text-center"
+                style={{
+                  left: `${globalOffset.x}%`,
+                  top: `${globalOffset.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 50
+                }}
+                drag
+                dragMomentum={false}
+                onDragEnd={(e, info) => {
+                  const rect = previewRef.current?.getBoundingClientRect();
+                  if (!rect) return;
+                  const deltaX = (info.offset.x / rect.width) * 100;
+                  const deltaY = (info.offset.y / rect.height) * 100;
+                  setGlobalOffset(prev => ({
+                    x: Math.round(Math.max(0, Math.min(100, prev.x + deltaX))),
+                    y: Math.round(Math.max(0, Math.min(100, prev.y + deltaY)))
+                  }));
+                }}
+              >
+                <div className="inline-block px-6 py-3 md:px-8 md:py-4 text-white bg-black/90 backdrop-blur-3xl rounded-[1.5rem] md:rounded-[2rem] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.6)] group-active/canvas:scale-105 transition-transform duration-300">
+                  <p className="text-lg sm:text-xl md:text-3xl font-black tracking-tight drop-shadow-[0_8px_16px_rgba(0,0,0,1)] whitespace-pre-wrap font-sans">
+                    {previewItem ? previewItem.text : "Preview Subtitle Pipeline"}
                   </p>
                 </div>
-                <div className="px-8 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20">
-                  Select Subtitles
-                </div>
-                <input type="file" className="hidden" accept=".srt,.vtt,.ass,.ssa" onChange={handleFileUpload} />
-              </label>
+              </motion.div>
             </div>
-          ) : (
-            <>
-              {/* Stage Controls Overlay */}
-              <div className="flex items-center gap-3 p-1.5 bg-bg-surface/90 backdrop-blur-2xl border border-border-muted rounded-xl shadow-premium shrink-0 scale-90 sm:scale-100">
-                 <div className="flex items-center gap-1 bg-bg-base rounded-lg border border-border-muted p-0.5">
-                   <button onClick={() => setScale(s => Math.max(0.2, s - 0.1))} className="p-1.5 text-text-muted hover:text-white transition-colors"><ChevronLeft size={14}/></button>
-                   <span className="text-[9px] font-black w-10 text-center text-blue-400 font-mono">{Math.round(scale * 100)}%</span>
-                   <button onClick={() => setScale(s => Math.min(3, s + 0.1))} className="p-1.5 text-text-muted hover:text-white transition-colors"><ChevronRight size={14}/></button>
-                 </div>
-                 <div className="w-px h-4 bg-border-muted mx-0.5" />
-                 <button 
-                   onClick={() => setShowGuides(!showGuides)} 
-                   className={cn(
-                     "p-2 rounded-lg transition-all", 
-                     showGuides ? "text-blue-500 bg-blue-500/10 shadow-inner-glow" : "text-text-muted hover:text-white"
-                   )}
-                 >
-                   {showGuides ? <Eye size={16} /> : <EyeOff size={16} />}
-                 </button>
-              </div>
+          </div>
 
-              {/* Canvas Container - Responsive Scaling */}
-              <div className="flex-1 w-full flex items-center justify-center min-h-0 overflow-hidden relative group/canvas-container">
-                <div 
-                  ref={previewRef}
+          {/* Controls Section - Optimized for Vertical Space */}
+          <div className="w-full flex flex-col gap-3 md:gap-4 shrink-0 max-w-5xl pb-2">
+            {/* Presets Grid */}
+            <div className="w-full flex flex-wrap justify-center gap-1.5 md:gap-2">
+              {ALIGNMENT_PRESETS.map((preset) => (
+                <button
+                  key={preset.name}
+                  onClick={() => setGlobalOffset({ x: preset.x, y: preset.y })}
                   className={cn(
-                    "relative aspect-video bg-[#000] shadow-[0_30px_100px_rgba(0,0,0,0.8)] overflow-hidden ring-1 ring-white/5 rounded-2xl w-full max-h-full transition-transform duration-300 ease-out",
-                    showGuides ? "bg-grid opacity-100" : ""
+                    "px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[8px] md:text-[9px] font-black uppercase tracking-widest transition-all border font-display shrink-0",
+                    globalOffset.x === preset.x && globalOffset.y === preset.y
+                      ? "bg-blue-600 border-blue-500 text-white shadow-xl shadow-blue-600/20"
+                      : "bg-bg-surface/50 border-border-muted text-text-muted hover:text-white hover:border-white/20"
                   )}
-                  style={{ transform: `scale(${scale})`, width: 'auto', height: '100%', maxWidth: '100%' }}
                 >
-                  {showGuides && (
-                    <div className="absolute inset-0 pointer-events-none">
-                       <div className="absolute top-0 bottom-0 left-1/2 w-px bg-blue-500/20 -translate-x-1/2" />
-                       <div className="absolute left-0 right-0 top-1/2 h-px bg-blue-500/20 -translate-y-1/2" />
-                       <div className="absolute top-[10%] bottom-[10%] left-[10%] right-[10%] border border-dashed border-white/5 rounded-lg" />
-                    </div>
-                  )}
+                  {preset.name}
+                </button>
+              ))}
+            </div>
 
-                  {previewItem && (
-                    <motion.div
-                      className="absolute cursor-move select-none p-4 w-full text-center"
-                      style={{
-                        left: `${globalOffset.x}%`,
-                        top: `${globalOffset.y}%`,
-                        transform: 'translate(-50%, -50%)',
-                        zIndex: 50
-                      }}
-                      drag
-                      dragMomentum={false}
-                      onDragEnd={(e, info) => {
-                        const rect = previewRef.current?.getBoundingClientRect();
-                        if (!rect) return;
-                        const deltaX = (info.offset.x / rect.width) * 100;
-                        const deltaY = (info.offset.y / rect.height) * 100;
-                        setGlobalOffset(prev => ({
-                          x: Math.round(Math.max(0, Math.min(100, prev.x + deltaX))),
-                          y: Math.round(Math.max(0, Math.min(100, prev.y + deltaY)))
-                        }));
-                      }}
-                    >
-                      <div className="inline-block px-6 py-3 md:px-8 md:py-4 text-white bg-black/90 backdrop-blur-3xl rounded-[1.5rem] md:rounded-[2rem] border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.6)] group-active/canvas:scale-105 transition-transform duration-300">
-                        <p className="text-lg sm:text-xl md:text-3xl font-black tracking-tight drop-shadow-[0_8px_16px_rgba(0,0,0,1)] whitespace-pre-wrap font-sans">
-                          {previewItem.text}
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
+            {/* Bulk Controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 bg-bg-surface/80 border border-border-muted p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] backdrop-blur-3xl shadow-premium relative">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1 bg-blue-600 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-[0.3em] text-white shadow-2xl font-mono">
+                Spatial Calibration
               </div>
-
-              {/* Controls Section - Optimized for Vertical Space */}
-              <div className="w-full flex flex-col gap-3 md:gap-4 shrink-0 max-w-5xl pb-2">
-                {/* Presets Grid */}
-                <div className="w-full flex flex-wrap justify-center gap-1.5 md:gap-2">
-                  {ALIGNMENT_PRESETS.map((preset) => (
-                    <button
-                      key={preset.name}
-                      onClick={() => setGlobalOffset({ x: preset.x, y: preset.y })}
-                      className={cn(
-                        "px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[8px] md:text-[9px] font-black uppercase tracking-widest transition-all border font-display shrink-0",
-                        globalOffset.x === preset.x && globalOffset.y === preset.y
-                          ? "bg-blue-600 border-blue-500 text-white shadow-xl shadow-blue-600/20"
-                          : "bg-bg-surface/50 border-border-muted text-text-muted hover:text-white hover:border-white/20"
-                      )}
-                    >
-                      {preset.name}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Bulk Controls */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 bg-bg-surface/80 border border-border-muted p-4 md:p-6 rounded-[1.5rem] md:rounded-[2.5rem] backdrop-blur-3xl shadow-premium relative">
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 py-1 bg-blue-600 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-[0.3em] text-white shadow-2xl font-mono">
-                    Spatial Calibration
-                  </div>
-                  <RangeSlider 
-                    label="Horizontal Axis (X)" 
-                    value={globalOffset.x} 
-                    min={0} max={100} 
-                    icon={Move}
-                    onChange={(val) => setGlobalOffset(prev => ({ ...prev, x: val }))} 
-                  />
-                  <RangeSlider 
-                    label="Vertical Axis (Y)" 
-                    value={globalOffset.y} 
-                    min={0} max={100} 
-                    icon={Move}
-                    onChange={(val) => setGlobalOffset(prev => ({ ...prev, y: val }))} 
-                  />
-                </div>
-                
-                <p className="text-[8px] md:text-[9px] text-text-muted font-black text-center uppercase tracking-[0.3em] opacity-30 font-mono italic">
-                  Broadcasting values to {items.length} units
-                </p>
-              </div>
-            </>
-          )}
+              <RangeSlider 
+                label="Horizontal Axis (X)" 
+                value={globalOffset.x} 
+                min={0} max={100} 
+                icon={Move}
+                onChange={(val) => setGlobalOffset(prev => ({ ...prev, x: val }))} 
+              />
+              <RangeSlider 
+                label="Vertical Axis (Y)" 
+                value={globalOffset.y} 
+                min={0} max={100} 
+                icon={Move}
+                onChange={(val) => setGlobalOffset(prev => ({ ...prev, y: val }))} 
+              />
+            </div>
+            
+            <p className="text-[8px] md:text-[9px] text-text-muted font-black text-center uppercase tracking-[0.3em] opacity-30 font-mono italic">
+              {items.length > 0 ? `Broadcasting values to ${items.length} units` : "Spatial engine initialized and awaiting data"}
+            </p>
+          </div>
         </div>
       </main>
 
