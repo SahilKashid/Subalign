@@ -170,22 +170,18 @@ export default function App() {
       }
     }));
 
+    // If SRT, we export as VTT because SRT doesn't officially support alignment metadata
+    const exportFormat = format === 'srt' ? 'vtt' : format;
     let content = "";
     let mimeType = "text/plain";
 
-    if (format === 'srt' || format === 'vtt') {
-      mimeType = format === 'vtt' ? 'text/vtt' : 'application/x-subrip';
-      content = exportedItems.map((item, i) => {
-        const start = formatTime(item.start).replace('.', ',');
-        const end = formatTime(item.end).replace('.', ',');
-        const timeLine = format === 'vtt' 
-          ? `${formatTime(item.start)} --> ${formatTime(item.end)}${item.position ? ` line:${item.position.y}% position:${item.position.x}%` : ''}`
-          : `${start} --> ${end}`;
-        
+    if (exportFormat === 'vtt') {
+      mimeType = 'text/vtt';
+      content = "WEBVTT\n\n" + exportedItems.map((item, i) => {
+        const timeLine = `${formatTime(item.start)} --> ${formatTime(item.end)}${item.position ? ` line:${item.position.y}% position:${item.position.x}%` : ''}`;
         return `${i + 1}\n${timeLine}\n${item.text}\n\n`;
       }).join('');
-      if (format === 'vtt') content = "WEBVTT\n\n" + content;
-    } else if (format === 'ass') {
+    } else if (exportFormat === 'ass') {
       mimeType = "text/x-ass";
       content = "[Script Info]\nTitle: Exported from Subalign\nPlayResX: 1920\nPlayResY: 1080\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
       content += exportedItems.map(item => {
@@ -205,7 +201,7 @@ export default function App() {
     // Ensure we don't double up extensions
     const baseName = file?.name || 'subtitles';
     const nameWithoutExt = baseName.replace(/\.(srt|vtt|ass|ssa)$/i, '');
-    a.download = `${nameWithoutExt}_positioned.${format}`;
+    a.download = `${nameWithoutExt}_positioned.${exportFormat}`;
     
     a.click();
     URL.revokeObjectURL(url);
